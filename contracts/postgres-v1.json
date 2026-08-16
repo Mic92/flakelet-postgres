@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Mic92/flakelet-postgres/blob/main/contracts/postgres-v1.json",
+  "title": "postgres/v1",
+  "description": "Database claim published as exports.requires.postgres. Local socket peer authentication only: no password exists. The provider announces { \"contract\": \"postgres/v1\" }.",
+  "type": "object",
+  "required": ["database"],
+  "additionalProperties": false,
+  "properties": {
+    "database": { "type": "string" },
+    "role": {
+      "type": "string",
+      "description": "Owning role; defaults to the database name. Must match the unit's User= for peer authentication."
+    }
+  }
+}
