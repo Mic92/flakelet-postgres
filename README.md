@@ -34,4 +34,17 @@ database. `flakelet-postgres-orphans` lists databases no active claim covers.
 }
 ```
 
+## Export and import
+
+The provider announces `state` hooks, so `flakelet export` carries the
+database along: `pg_dump --format=custom` on the source, and on the target
+the database and role are created and the dump restored with the claimed
+role as owner. Restore refuses a non-empty database.
+
 Schema: [contracts/postgres-v1.json](contracts/postgres-v1.json).
+
+## Development
+
+```console
+$ nix build ./tests#checks.x86_64-linux.vm-transfer -L
+```

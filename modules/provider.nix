@@ -58,6 +58,50 @@ let
       } | psql --no-psqlrc -qtA -v ON_ERROR_STOP=1
     '';
   };
+
+  # State hooks for `flakelet export`/`import`, called as root with
+  # <claim.json> <dir>. Custom format so restore can reassign ownership.
+  dump = pkgs.writeShellApplication {
+    name = "flakelet-postgres-dump";
+    runtimeInputs = [
+      pkgs.jq
+      pkgs.util-linux
+      pg
+    ];
+    text = ''
+      db=$(jq -r .database "$1")
+      runuser -u postgres -- pg_dump --format=custom --no-owner "$db" > "$2/db.pgdump"
+    '';
+  };
+
+  restore = pkgs.writeShellApplication {
+    name = "flakelet-postgres-restore";
+    runtimeInputs = [
+      pkgs.jq
+      pkgs.util-linux
+      pg
+    ];
+    text = ''
+      db=$(jq -r .database "$1")
+      role=$(jq -r '.role // .database' "$1")
+      psql=(runuser -u postgres -- psql --no-psqlrc -qtA -v ON_ERROR_STOP=1)
+      # Runs before the exports file exists on this host, so provision here.
+      "''${psql[@]}" <<SQL
+      SELECT format('CREATE ROLE %I LOGIN', '$role')
+        WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '$role') \gexec
+      SELECT format('CREATE DATABASE %I OWNER %I', '$db', '$role')
+        WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$db') \gexec
+      COMMENT ON DATABASE "$db" IS 'flakelet postgres/v1';
+      SQL
+      # Add-only: never overwrite data that is already there.
+      tables=$("''${psql[@]}" -d "$db" -c "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind IN ('r','p','S','v','m') AND n.nspname NOT IN ('pg_catalog','information_schema')")
+      if [ "$tables" != 0 ]; then
+        echo "flakelet-postgres-restore: database $db is not empty, refusing" >&2
+        exit 1
+      fi
+      runuser -u postgres -- pg_restore --dbname="$db" --no-owner --role="$role" --exit-on-error < "$2/db.pgdump"
+    '';
+  };
 in
 {
   options.services.flakelet-postgres = {
@@ -80,6 +124,10 @@ in
 
     environment.etc."flakelet/providers.d/postgres-v1.json".text = builtins.toJSON {
       contract = "postgres/v1";
+      state = {
+        dump = lib.getExe dump;
+        restore = lib.getExe restore;
+      };
     };
 
     environment.systemPackages = [ orphans ];
