@@ -24,8 +24,10 @@ user named differently from the role, configure
 `services.postgresql.identMap` on the host.
 
 The provider requires `services.postgresql.enable` and composes with
-`ensureDatabases`. It never drops anything, so rollbacks always find their
-database. `flakelet-postgres-orphans` lists databases no active claim covers.
+`ensureDatabases`. flakelet calls its `provision` hook before starting a
+service, so the database exists on first start. It never drops anything,
+so rollbacks always find their database. `flakelet-postgres-orphans` lists
+databases no active claim covers.
 
 ```nix
 {
@@ -46,5 +48,5 @@ Schema: [contracts/postgres-v1.json](contracts/postgres-v1.json).
 ## Development
 
 ```console
-$ nix build ./tests#checks.x86_64-linux.vm-transfer -L
+$ nix build ./tests#checks.x86_64-linux.transfer -L
 ```
