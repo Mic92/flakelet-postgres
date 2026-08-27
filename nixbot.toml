@@ -1,0 +1,2 @@
+# Checks live in a dev-only sub-flake so the top-level flake stays input-free.
+flake_dir = "tests"
