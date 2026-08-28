@@ -3,7 +3,7 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flakelet.url = "github:Mic92/flakelet/docs-split";
+    flakelet.url = "github:Mic92/flakelet";
     flakelet.inputs.nixpkgs.follows = "nixpkgs";
   };
 

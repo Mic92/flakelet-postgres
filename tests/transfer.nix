@@ -14,7 +14,11 @@ let
       { ... }:
       {
         impl =
-          { pkgs, name, ... }:
+          { inputs, ... }:
+          let
+            inherit (inputs.nixpkgs) pkgs;
+            inherit (inputs.flakelet) name;
+          in
           {
             services.${name} = {
               wantedBy = [ "multi-user.target" ];
@@ -69,13 +73,13 @@ in
     a.succeed(${py (psql "web" "web" "CREATE TABLE t(v text); INSERT INTO t VALUES ('payload')")})
 
     a.succeed("flakelet export web --dry-run >&2")
-    a.succeed("flakelet export web > /tmp/shared/web.tar.zst")
-    print(a.succeed("tar --zstd -tf /tmp/shared/web.tar.zst"))
+    a.succeed("flakelet export web --to b > /tmp/shared/web.tar.zst")
+    a.fail("systemctl is-active web.service")
     a.succeed("tar --zstd -tf /tmp/shared/web.tar.zst | grep -q requires/postgres/db.pgdump")
 
     b.wait_for_unit("postgresql.target")
-    # b declares web itself (prebuilt), so import uses that entry.
-    b.succeed("systemctl stop flakelet-web.service; flakelet remove --purge web")
+    # b declares and runs web itself (prebuilt) on an empty database.
+    b.wait_for_unit("web.service", timeout=600)
     b.succeed("flakelet import - < /tmp/shared/web.tar.zst >&2", timeout=600)
     b.succeed("systemctl is-active web.service")
     # Data arrived and the claimed role owns it, so peer auth works as on a.
@@ -83,8 +87,12 @@ in
     b.succeed(${py "${psql "postgres" "web" "SELECT tableowner FROM pg_tables WHERE tablename='t'"} | grep -qx web"})
     b.succeed(${py "${psql "postgres" "postgres" "SELECT shobj_description(oid, 'pg_database') FROM pg_database WHERE datname='web'"} | grep -q flakelet"})
 
-    # Add-only: a second restore into the now non-empty database is refused.
-    b.succeed("flakelet remove --purge web")
-    b.fail("flakelet import /tmp/shared/web.tar.zst")
+    # Add-only: a second restore into the now non-empty database is refused
+    # and leaves web disabled. --replace drops and restores it.
+    b.fail("flakelet import /tmp/shared/web.tar.zst >&2")
+    b.fail("systemctl is-active web.service")
+    b.succeed("flakelet import --replace /tmp/shared/web.tar.zst >&2", timeout=600)
+    b.succeed("systemctl is-active web.service")
+    b.succeed(${py "${psql "web" "web" "SELECT v FROM t"} | grep -qx payload"})
   '';
 }

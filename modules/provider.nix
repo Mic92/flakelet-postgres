@@ -48,8 +48,11 @@ let
   '';
 
   restore = hook "restore" ''
+    if [ -n "''${FLAKELET_REPLACE:-}" ]; then
+      psql -d postgres -c "DROP DATABASE IF EXISTS \"$db\""
+    fi
     ${lib.getExe provision} "$1"
-    # Add-only: never overwrite data that is already there.
+    # Add-only unless asked: never overwrite data that is already there.
     tables=$(psql -d "$db" -c "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind IN ('r','p','S','v','m') AND n.nspname NOT IN ('pg_catalog','information_schema')")
     if [ "$tables" != 0 ]; then
       echo "flakelet-postgres-restore: database $db is not empty, refusing" >&2
