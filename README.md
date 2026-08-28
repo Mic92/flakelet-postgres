@@ -43,6 +43,15 @@ database along: `pg_dump --format=custom` on the source, and on the target
 the database and role are created and the dump restored with the claimed
 role as owner. Restore refuses a non-empty database unless `flakelet import --replace` asks it to drop and recreate it.
 
+## Options
+
+`services.flakelet-postgres.*`:
+
+| option       | type | default                 | description |
+| ------------ | ---- | ----------------------- | ----------- |
+| `enable`     | bool | `false`                 | enable the provider; requires `services.postgresql.enable` |
+| `exportsDir` | path | `/run/flakelet/exports` | where flakelet publishes exports, read by `flakelet-postgres-orphans` |
+
 Schema: [contracts/postgres-v1.json](contracts/postgres-v1.json).
 
 ## Development
